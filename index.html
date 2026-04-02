@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Ön Yazı Asistanı</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="container glass">
+        <header>
+            <h1>✨ AI Ön Yazı Asistanı</h1>
+            <p>İş ilanlarına saniyeler içinde mükemmel, kişiselleştirilmiş ön yazılar hazırlayın.</p>
+        </header>
+
+        <main class="grid-layout">
+            <section class="inputs-section">
+                <div class="form-group">
+                    <label for="apiKey">Gemini API Anahtarı 
+                        <span class="tooltip" title="Anahtarınız güvendedir, sadece kendi tarayıcınızın belleğinde (LocalStorage) saklanır, sunucuya gönderilmez.">ⓘ</span>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="margin-left: auto; color: #818cf8; text-decoration: none; font-size: 0.85rem; background: rgba(129, 140, 248, 0.1); padding: 3px 8px; border-radius: 6px;">Ücretsiz Anahtar Al ↗</a>
+                    </label>
+                    <input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="cvText">Özgeçmişiniz (CV) / Yetenekleriniz</label>
+                    <textarea id="cvText" rows="6" placeholder="Kısaca eğitim durumunuzu, çalıştığınız rolleri ve araçları/teknolojileri özetleyin..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="jobText">Hedef İş İlanı</label>
+                    <textarea id="jobText" rows="6" placeholder="Başvurmak istediğiniz pozisyonun ilan metnini buraya yapıştırın..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="langSelect">Çıktı Dili</label>
+                    <select id="langSelect">
+                        <option value="Türkçe">Türkçe 🇹🇷</option>
+                        <option value="İngilizce">İngilizce 🇬🇧</option>
+                    </select>
+                </div>
+
+                <button id="generateBtn" class="primary-btn">
+                    <span class="btn-text">Ön Yazı Üret</span>
+                    <div class="loader" id="btnLoader" style="display: none;"></div>
+                </button>
+            </section>
+
+            <section class="output-section">
+                <div class="output-header">
+                    <h2>Oluşturulan Taslak</h2>
+                    <button id="copyBtn" class="secondary-btn" disabled>Kopyala 📋</button>
+                </div>
+                <div id="outputArea" class="output-area">
+                    <div class="placeholder-container">
+                        <div class="icon">📝</div>
+                        <p class="placeholder-text">Sihrin gerçekleşmesini bekliyoruz... API anahtarı, CV ve ilanını girip "Üret" butonuna bas.</p>
+                    </div>
+                </div>
+                <!-- Bildirim Component -->
+                <div id="toast" class="toast">Panoya Kopyalandı!</div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
