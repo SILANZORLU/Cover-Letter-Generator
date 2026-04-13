@@ -94,10 +94,35 @@ Katı Kurallar:
                     </div>`;
             }
 
-            // Google'ın cömert ücretsiz limiti olan modelini sabitliyoruz (Gereksiz API isteklerini önlemek için)
-            const targetModel = "gemini-1.5-flash"; 
+            // 1. DİNAMİK MODEL SEÇİMİ: Google'ın API sürümüne göre aktif modelleri alıyoruz
+            const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            let targetModel = "gemini-2.5-flash"; // Modern varsayılan
 
-            // 1. Doğrudan metin üretimini başlat
+            if (modelsResponse.ok) {
+                const modelsData = await modelsResponse.json();
+                if (modelsData.models && Array.isArray(modelsData.models)) {
+                    const validModel = modelsData.models.find(m => 
+                        m.supportedGenerationMethods && 
+                        m.supportedGenerationMethods.includes('generateContent') && 
+                        m.name.includes('gemini')
+                    );
+                    if (validModel) {
+                        targetModel = validModel.name.replace('models/', '');
+                    }
+                }
+            } else {
+                 const errData = await modelsResponse.json().catch(() => ({}));
+                 const lowerErr = (errData.error?.message || '').toLowerCase();
+                 if (errData.error?.code === 429 || lowerErr.includes("quota") || lowerErr.includes("rate limit")) {
+                      if (retryWait === 0) {
+                          const retryMatch = errData.error?.message?.match(/retry in ([\d\.]+)s/i);
+                          const waitTime = retryMatch && retryMatch[1] ? Math.ceil(parseFloat(retryMatch[1])) + 2 : 60;
+                          return generateLetter(waitTime);
+                      }
+                 }
+            }
+
+            // 2. Doğrudan metin üretimini başlat
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: {
@@ -200,3 +225,4 @@ Katı Kurallar:
         });
     });
 });
+
