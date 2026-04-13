@@ -56,9 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>`;
         copyBtn.disabled = true;
 
-        try {
-            // Carefully crafted instruction prompt for high-quality cover letters
-            const prompt = `Sen üst düzey bir Kariyer Koçu ve İnsan Kaynakları Uzmanısın. İş arayan bir adayın özgeçmişini ve başvurmak istediği iş ilanının tanımını sana vereceğim. Görevin, adayın yetenekleri ile ilanın gereksinimlerini en pürüzsüz ve ikna edici şekilde eşleştiren, profesyonel, akıcı ve çok uzun olmayan net bir Ön Yazı (Cover Letter) oluşturmaktır.
+        // Carefully crafted instruction prompt for high-quality cover letters
+        const prompt = `Sen üst düzey bir Kariyer Koçu ve İnsan Kaynakları Uzmanısın. İş arayan bir adayın özgeçmişini ve başvurmak istediği iş ilanının tanımını sana vereceğim. Görevin, adayın yetenekleri ile ilanın gereksinimlerini en pürüzsüz ve ikna edici şekilde eşleştiren, profesyonel, akıcı ve çok uzun olmayan net bir Ön Yazı (Cover Letter) oluşturmaktır.
 
 Adayın Özgeçmiş Özeti / Yetenekleri:
 ${cvText}
@@ -73,25 +72,32 @@ Katı Kurallar:
 4. KLASİK MEKTUP BAŞLIKLARINI KALDIR! En tepeye [Ad Soyad], [Tarih], [Adres] gibi gereksiz bloklar KESİNLİKLE koyma. Yazıya sadece doğrudan hitapla (örn: "Sayın [Şirket Adı] İşe Alım Yöneticisi,") başla.
 5. CV'de olmayan uydurma tecrübeler ekleme. Uzun kelimelerle laf kalabalığı yapma. Hedef odaklı, doğrudan ve çok net bir dil kullan.`;
 
-            // 1. DİNAMİK MODEL SEÇİMİ: Google'a "Benim hesabım için hangi modeller açık?" diye soruyoruz.
-            const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-            const modelsData = await modelsResponse.json();
-            
-            let targetModel = "gemini-1.5-flash"; // Varsayılan
-            if (modelsData.models && Array.isArray(modelsData.models)) {
-                // "generateContent" destekleyen ve isminde gemini geçen ilk modeli otomatik bul
-                const validModel = modelsData.models.find(m => 
-                    m.supportedGenerationMethods && 
-                    m.supportedGenerationMethods.includes('generateContent') && 
-                    m.name.includes('gemini')
-                );
-                if (validModel) {
-                    // Bulunan modelin ismini (örneğin "models/gemini-1.5-pro") kullanarak metni al
-                    targetModel = validModel.name.replace('models/', '');
-                }
+        const generateLetter = async (retryWait = 0) => {
+            if (retryWait > 0) {
+                 outputArea.innerHTML = `
+                    <div class="placeholder-container">
+                        <div class="icon" style="font-size: 2rem;">⏳</div>
+                        <p class="placeholder-text" style="color: #cbd5e1; margin-bottom: 0.5rem; line-height: 1.5;">Çok fazla istek atıldı. (API Zaman Aşımı Koruması)</p>
+                        <p style="color: #fca5a5; font-weight: bold; margin-top: 0;">Sistem <span id="waitSecs">${retryWait}</span> saniye sonra otomatik tekrar deneyecek...</p>
+                    </div>`;
+                 
+                 for (let i = retryWait; i > 0; i--) {
+                     const waitEl = document.getElementById('waitSecs');
+                     if (waitEl) waitEl.innerText = i;
+                     await new Promise(r => setTimeout(r, 1000));
+                 }
+                 
+                 outputArea.innerHTML = `
+                    <div class="placeholder-container">
+                        <div class="icon">🔄</div>
+                        <p class="placeholder-text" style="color: #cbd5e1;">Bekleme süresi doldu, yeniden deneniyor...</p>
+                    </div>`;
             }
 
-            // 2. Bulunan doğru model ile metin üretimini başlat
+            // Google'ın cömert ücretsiz limiti olan modelini sabitliyoruz (Gereksiz API isteklerini önlemek için)
+            const targetModel = "gemini-1.5-flash"; 
+
+            // 1. Doğrudan metin üretimini başlat
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: {
@@ -109,12 +115,33 @@ Katı Kurallar:
 
             // API Error handling
             if (!response.ok) {
-                // Determine if it's an API Key auth error
                 if(data.error?.code === 400 && data.error?.message.includes("API key")) {
                     throw new Error("Geçersiz API Anahtarı. Lütfen kontrol edip tekrar deneyin.");
                 }
-                throw new Error(data.error?.message || 'Gemini API ile iletişimde bir hata oluştu.');
+
+                let errorMsg = data.error?.message || 'Gemini API ile iletişimde bir hata oluştu.';
+                const lowerMsg = errorMsg.toLowerCase();
+
+                if (lowerMsg.includes("high demand") || lowerMsg.includes("overloaded")) {
+                    throw new Error("Google Gemini sunucuları şu anda çok yoğun. Bu geçici bir durumdur, lütfen birkaç dakika bekleyip tekrar deneyin.");
+                } else if (lowerMsg.includes("quota") || lowerMsg.includes("rate limit") || data.error?.code === 429) {
+                    if (retryWait === 0) {
+                        const retryMatch = data.error?.message?.match(/retry in ([\d\.]+)s/i);
+                        const waitTime = retryMatch && retryMatch[1] ? Math.ceil(parseFloat(retryMatch[1])) + 2 : 60;
+                        return generateLetter(waitTime);
+                    } else {
+                        throw new Error("Otomatik bekleme sonrası hala limit hatası alınıyor. Lütfen farklı bir API Key kullanın veya 1 saat bekleyin.");
+                    }
+                }
+                
+                throw new Error(errorMsg);
             }
+
+            return data;
+        };
+
+        try {
+            const data = await generateLetter();
 
             const generatedText = data.candidates[0].content.parts[0].text;
             currentCoverLetter = generatedText;
